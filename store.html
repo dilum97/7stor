@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7 Store — Inventory</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a26;
+    --border: #2a2a3e;
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --success: #10b981;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --card: #13131f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a0533 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #a855f7, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: -0.02em;
+  }
+
+  .logo span { font-weight: 400; font-size: 0.85rem; color: var(--muted); -webkit-text-fill-color: var(--muted); margin-left: 8px; }
+
+  .nav-links { display: flex; gap: 1rem; }
+  .nav-link {
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    color: var(--muted);
+  }
+  .nav-link:hover { color: var(--text); border-color: var(--border); background: var(--surface2); }
+  .nav-link.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* LAYOUT */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 0;
+    height: calc(100vh - 64px);
+  }
+
+  /* ADD FORM PANEL */
+  .add-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .panel-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-title i { color: var(--accent2); }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.82rem;
+    padding: 10px 14px;
+    outline: none;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+  }
+  .form-group select option { background: var(--surface2); }
+
+  /* Image Upload */
+  .img-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface2);
+    position: relative;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .img-upload-area:hover { border-color: var(--accent); background: rgba(124,58,237,0.05); }
+  .img-upload-area i { font-size: 1.5rem; color: var(--muted); }
+  .img-upload-area p { font-size: 0.72rem; color: var(--muted); }
+  .img-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .img-preview { width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid var(--accent); }
+
+  .upload-progress {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    display: none;
+  }
+  .upload-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    width: 0%;
+    transition: width 0.3s;
+  }
+
+  .btn {
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.88rem;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #9333ea);
+    color: #fff;
+  }
+  .btn-primary:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+
+  /* TABLE PANEL */
+  .table-panel {
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .table-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 800;
+  }
+
+  .search-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 14px 9px 36px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    outline: none;
+    width: 220px;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .search-wrap { position: relative; }
+  .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.8rem; }
+  .search-bar:focus { border-color: var(--accent); }
+
+  /* Stats Row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+  }
+  .stat-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; }
+  .stat-value.purple { color: var(--accent); }
+  .stat-value.cyan { color: var(--accent2); }
+  .stat-value.green { color: var(--success); }
+  .stat-value.amber { color: var(--warning); }
+
+  /* Table */
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead {
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  th {
+    padding: 12px 14px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-align: left;
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px;
+    font-size: 0.78rem;
+    border-bottom: 1px solid rgba(42,42,62,0.5);
+    vertical-align: middle;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(124,58,237,0.04); }
+
+  .item-img {
+    width: 40px; height: 40px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .item-code { font-size: 0.7rem; color: var(--accent2); font-weight: 700; }
+  .item-name { font-weight: 700; font-size: 0.82rem; }
+  .item-cat {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 20px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    background: rgba(124,58,237,0.15);
+    color: #a78bfa;
+    border: 1px solid rgba(124,58,237,0.3);
+  }
+
+  .qty-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .qty-ok { background: rgba(16,185,129,0.12); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+  .qty-low { background: rgba(245,158,11,0.12); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
+  .qty-out { background: rgba(239,68,68,0.12); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+
+  .price { font-weight: 700; color: var(--success); }
+  .ws-price { color: var(--muted); font-size: 0.72rem; }
+
+  .action-btns { display: flex; gap: 6px; }
+  .btn-icon {
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+  }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-icon.danger:hover { border-color: var(--danger); color: var(--danger); }
+  .btn-icon.success:hover { border-color: var(--success); color: var(--success); }
+
+  /* WARNING TOAST */
+  .toast-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .toast {
+    background: var(--surface);
+    border: 1px solid var(--warning);
+    border-left: 4px solid var(--warning);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: slideIn 0.3s ease;
+    max-width: 300px;
+  }
+  .toast i { color: var(--warning); }
+  .toast.error { border-color: var(--danger); }
+  .toast.error i { color: var(--danger); }
+  .toast.success-t { border-color: var(--success); }
+  .toast.success-t i { color: var(--success); }
+
+  @keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2rem;
+    width: 440px;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal h3 { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; margin-bottom: 1.5rem; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 1.5rem; }
+  .modal-btns .btn { flex: 1; }
+
+  /* Restock Modal */
+  .restock-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    padding: 12px 16px;
+    outline: none;
+    width: 100%;
+    text-align: center;
+  }
+  .restock-input:focus { border-color: var(--success); }
+
+  .loading { text-align: center; padding: 3rem; color: var(--muted); font-size: 0.85rem; }
+  .empty-state { text-align: center; padding: 3rem; color: var(--muted); }
+  .empty-state i { font-size: 2.5rem; opacity: 0.3; display: block; margin-bottom: 1rem; }
+
+  .firebase-config-notice {
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.72rem;
+    color: var(--warning);
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filter-btn {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn.active, .filter-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(124,58,237,0.1);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">7 Store <span>/ Inventory</span></div>
+  <div class="nav-links">
+    <a class="nav-link active" href="store.html"><i class="fas fa-boxes-stacked"></i> Store</a>
+    <a class="nav-link" href="cashier.html"><i class="fas fa-cash-register"></i> Cashier</a>
+  </div>
+</header>
+
+<div class="main-layout">
+
+  <!-- ADD ITEM PANEL -->
+  <div class="add-panel">
+    <div class="panel-title"><i class="fas fa-plus-circle"></i> Add / Edit Item</div>
+
+    <div class="firebase-config-notice" id="configNotice">
+      <i class="fas fa-triangle-exclamation"></i>
+      <span>Firebase & Cloudinary config set කරන්න — page bottom script section බලන්න.</span>
+    </div>
+
+    <div class="form-group">
+      <label>Category</label>
+      <select id="fCategory">
+        <option value="">Select Category</option>
+        <option>Smartphones</option>
+        <option>Laptops</option>
+        <option>Tablets</option>
+        <option>Accessories</option>
+        <option>Audio</option>
+        <option>Networking</option>
+        <option>Storage</option>
+        <option>Gaming</option>
+        <option>Cameras</option>
+        <option>Other</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Item Name</label>
+      <input type="text" id="fName" placeholder="e.g. Samsung Galaxy S24">
+    </div>
+
+    <div class="form-group">
+      <label>Item Code</label>
+      <input type="text" id="fCode" placeholder="e.g. SAM-GS24-BLK">
+    </div>
+
+    <div class="form-group">
+      <label>Wholesale Price (Rs.)</label>
+      <input type="number" id="fWsPrice" placeholder="0.00" min="0" step="0.01">
+    </div>
+
+    <div class="form-group">
+      <label>Retail Price (Rs.)</label>
+      <input type="number" id="fRetailPrice" placeholder="0.00" min="0" step="0.01">
+    </div>
+
+    <div class="form-group">
+      <label>Quantity</label>
+      <input type="number" id="fQty" placeholder="0" min="0">
+    </div>
+
+    <div class="form-group">
+      <label>Low Stock Warning Threshold</label>
+      <input type="number" id="fLowStock" placeholder="5" min="1" value="5">
+    </div>
+
+    <div class="form-group">
+      <label>Item Image</label>
+      <div class="img-upload-area" id="uploadArea">
+        <input type="file" id="fImage" accept="image/*" onchange="previewImage(event)">
+        <i class="fas fa-cloud-arrow-up"></i>
+        <p>Click to upload image</p>
+        <p style="font-size:0.65rem; color:#4a4a6a;">Cloudinary — JPG, PNG, WEBP</p>
+      </div>
+      <div class="upload-progress" id="uploadProgress">
+        <div class="upload-progress-bar" id="uploadProgressBar"></div>
+      </div>
+    </div>
+
+    <input type="hidden" id="fImageUrl">
+    <input type="hidden" id="editItemId">
+
+    <button class="btn btn-primary" id="addBtn" onclick="saveItem()">
+      <i class="fas fa-plus"></i> <span id="addBtnText">Add Item</span>
+    </button>
+    <button class="btn btn-secondary" onclick="clearForm()">
+      <i class="fas fa-rotate-left"></i> Clear Form
+    </button>
+  </div>
+
+  <!-- TABLE PANEL -->
+  <div class="table-panel">
+
+    <div class="table-header">
+      <div class="table-title" style="font-family:'Syne',sans-serif;">
+        📦 Inventory
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div class="search-wrap">
+          <i class="fas fa-search"></i>
+          <input class="search-bar" type="text" placeholder="Search items..." oninput="filterTable(this.value)">
+        </div>
+      </div>
+    </div>
+
+    <div class="stats-row" id="statsRow">
+      <div class="stat-card">
+        <div class="stat-label">Total Items</div>
+        <div class="stat-value purple" id="statTotal">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Stock Value</div>
+        <div class="stat-value cyan" id="statValue">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Low Stock</div>
+        <div class="stat-value amber" id="statLow">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Out of Stock</div>
+        <div class="stat-value" style="color:var(--danger)" id="statOut">—</div>
+      </div>
+    </div>
+
+    <div class="filter-row" id="catFilters"></div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Category</th>
+            <th>Item Name</th>
+            <th>Code</th>
+            <th>WS Price</th>
+            <th>Retail Price</th>
+            <th>QTY</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="itemTableBody">
+          <tr><td colspan="8"><div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- EDIT/RESTOCK MODAL -->
+<div class="modal-overlay" id="restockModal">
+  <div class="modal">
+    <h3><i class="fas fa-cubes-stacked" style="color:var(--success)"></i> Restock Item</h3>
+    <div id="restockItemName" style="margin-bottom:1rem;font-size:0.85rem;color:var(--muted);"></div>
+    <div class="form-group">
+      <label>Current QTY: <span id="restockCurrent" style="color:var(--accent2)"></span></label>
+      <label style="margin-top:10px;">Add Quantity</label>
+      <input class="restock-input" type="number" id="restockQty" min="1" placeholder="Enter qty to add">
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal('restockModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmRestock()" style="background:linear-gradient(135deg,var(--success),#059669)">
+        <i class="fas fa-plus"></i> Restock
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <h3><i class="fas fa-trash" style="color:var(--danger)"></i> Delete Item</h3>
+    <p style="color:var(--muted);font-size:0.85rem;">Are you sure you want to delete <strong id="deleteItemName" style="color:var(--text)"></strong>? This cannot be undone.</p>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmDelete()" style="background:linear-gradient(135deg,var(--danger),#b91c1c)">
+        <i class="fas fa-trash"></i> Delete
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyC0FoX4oDkeVld_GNWT3nPVzicmzhXCMH8",
+  authDomain: "store-81e88.firebaseapp.com",
+  projectId: "store-81e88",
+  storageBucket: "store-81e88.firebasestorage.app",
+  messagingSenderId: "681839217421",
+  appId: "1:681839217421:web:702a25e2b2c44d95723e44"
+};
+
+const CLOUDINARY_CLOUD_NAME = "dzta29win";
+const CLOUDINARY_UPLOAD_PRESET = "7store_items";
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let allItems = [];
+let activeCategory = 'All';
+let restockItemId = null;
+let deleteItemId = null;
+let uploadedImageUrl = '';
+
+// ---- INIT ----
+window.onload = () => {
+  loadItems();
+};
+
+// ---- FIRESTORE LISTENER ----
+function loadItems() {
+  db.collection('inventory').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+    allItems = [];
+    snapshot.forEach(doc => {
+      allItems.push({ id: doc.id, ...doc.data() });
+    });
+    updateStats();
+    buildCatFilters();
+    renderTable(allItems);
+    checkLowStock();
+  }, err => {
+    console.error(err);
+    showToast('Firebase connection failed. Check config.', 'error');
+  });
+}
+
+// ---- RENDER TABLE ----
+function renderTable(items) {
+  const tbody = document.getElementById('itemTableBody');
+  if (!items.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><i class="fas fa-box-open"></i>No items found</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = items.map(item => {
+    const qtyClass = item.qty <= 0 ? 'qty-out' : item.qty <= (item.lowStock || 5) ? 'qty-low' : 'qty-ok';
+    const qtyIcon = item.qty <= 0 ? '🔴' : item.qty <= (item.lowStock || 5) ? '⚠️' : '✅';
+    return `
+    <tr>
+      <td>${item.imageUrl ? `<img class="item-img" src="${item.imageUrl}" alt="">` : `<div class="item-img" style="background:var(--surface2);display:flex;align-items:center;justify-content:center;"><i class="fas fa-image" style="color:var(--muted);font-size:1rem"></i></div>`}</td>
+      <td><span class="item-cat">${item.category || '—'}</span></td>
+      <td><div class="item-name">${item.name}</div></td>
+      <td><span class="item-code">${item.code}</span></td>
+      <td><span class="ws-price">Rs. ${Number(item.wsPrice).toLocaleString()}</span></td>
+      <td><span class="price">Rs. ${Number(item.retailPrice).toLocaleString()}</span></td>
+      <td><span class="qty-badge ${qtyClass}">${qtyIcon} ${item.qty}</span></td>
+      <td>
+        <div class="action-btns">
+          <button class="btn-icon success" title="Restock" onclick="openRestock('${item.id}')"><i class="fas fa-plus"></i></button>
+          <button class="btn-icon" title="Edit" onclick="editItem('${item.id}')"><i class="fas fa-pen"></i></button>
+          <button class="btn-icon danger" title="Delete" onclick="openDelete('${item.id}')"><i class="fas fa-trash"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ---- STATS ----
+function updateStats() {
+  document.getElementById('statTotal').textContent = allItems.length;
+  const totalVal = allItems.reduce((s, i) => s + (i.wsPrice * i.qty), 0);
+  document.getElementById('statValue').textContent = 'Rs. ' + Math.round(totalVal).toLocaleString();
+  const low = allItems.filter(i => i.qty > 0 && i.qty <= (i.lowStock || 5)).length;
+  const out = allItems.filter(i => i.qty <= 0).length;
+  document.getElementById('statLow').textContent = low;
+  document.getElementById('statOut').textContent = out;
+}
+
+// ---- CATEGORY FILTERS ----
+function buildCatFilters() {
+  const cats = ['All', ...new Set(allItems.map(i => i.category).filter(Boolean))];
+  document.getElementById('catFilters').innerHTML = cats.map(c =>
+    `<button class="filter-btn ${c === activeCategory ? 'active' : ''}" onclick="setCategory('${c}')">${c}</button>`
+  ).join('');
+}
+
+function setCategory(cat) {
+  activeCategory = cat;
+  buildCatFilters();
+  const filtered = cat === 'All' ? allItems : allItems.filter(i => i.category === cat);
+  renderTable(filtered);
+}
+
+// ---- SEARCH ----
+function filterTable(q) {
+  const base = activeCategory === 'All' ? allItems : allItems.filter(i => i.category === activeCategory);
+  const filtered = base.filter(i =>
+    i.name.toLowerCase().includes(q.toLowerCase()) ||
+    i.code.toLowerCase().includes(q.toLowerCase())
+  );
+  renderTable(filtered);
+}
+
+// ---- LOW STOCK WARNINGS ----
+function checkLowStock() {
+  allItems.forEach(item => {
+    if (item.qty <= 0) {
+      showToast(`Out of stock: ${item.name}`, 'error', 4000);
+    } else if (item.qty <= (item.lowStock || 5)) {
+      showToast(`Low stock: ${item.name} — Only ${item.qty} left`, 'warning', 4000);
+    }
+  });
+}
+
+// ---- SAVE ITEM ----
+async function saveItem() {
+  const id = document.getElementById('editItemId').value;
+  const category = document.getElementById('fCategory').value;
+  const name = document.getElementById('fName').value.trim();
+  const code = document.getElementById('fCode').value.trim();
+  const wsPrice = parseFloat(document.getElementById('fWsPrice').value) || 0;
+  const retailPrice = parseFloat(document.getElementById('fRetailPrice').value) || 0;
+  const qty = parseInt(document.getElementById('fQty').value) || 0;
+  const lowStock = parseInt(document.getElementById('fLowStock').value) || 5;
+  const imageUrl = document.getElementById('fImageUrl').value || uploadedImageUrl || '';
+
+  if (!name || !code) { showToast('Item name and code required!', 'error'); return; }
+
+  const btn = document.getElementById('addBtn');
+  btn.disabled = true;
+
+  // Upload image if file selected
+  const fileInput = document.getElementById('fImage');
+  let finalImageUrl = imageUrl;
+  if (fileInput.files[0]) {
+    finalImageUrl = await uploadToCloudinary(fileInput.files[0]);
+    if (!finalImageUrl) { btn.disabled = false; return; }
+  }
+
+  const data = { category, name, code, wsPrice, retailPrice, qty, lowStock, imageUrl: finalImageUrl };
+
+  try {
+    if (id) {
+      await db.collection('inventory').doc(id).update(data);
+      showToast('Item updated!', 'success');
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection('inventory').add(data);
+      showToast('Item added!', 'success');
+    }
+    clearForm();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  btn.disabled = false;
+}
+
+// ---- CLOUDINARY UPLOAD ----
+async function uploadToCloudinary(file) {
+  const progressEl = document.getElementById('uploadProgress');
+  const bar = document.getElementById('uploadProgressBar');
+
+  progressEl.style.display = 'block';
+  bar.style.width = '20%';
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', '7store_items');
+  formData.append('folder', '7store_items');
+
+  try {
+    bar.style.width = '60%';
+
+    const res = await fetch(
+      'https://api.cloudinary.com/v1_1/dzta29win/image/upload',
+      {
+        method: 'POST',
+        body: formData
+      }
+    );
+
+    const data = await res.json();
+
+    bar.style.width = '100%';
+
+    setTimeout(() => {
+      progressEl.style.display = 'none';
+      bar.style.width = '0%';
+    }, 400);
+
+    if (data.secure_url) {
+      showToast('Image uploaded!', 'success');
+      return data.secure_url;
+    } else {
+      showToast(data.error?.message || 'Upload failed', 'error');
+      return '';
+    }
+
+  } catch (e) {
+    progressEl.style.display = 'none';
+    showToast(e.message, 'error');
+    return '';
+  }
+}
+// ---- PREVIEW IMAGE ----
+function previewImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const area = document.getElementById('uploadArea');
+    area.innerHTML = `
+      <input type="file" id="fImage" accept="image/*" onchange="previewImage(event)">
+      <img class="img-preview" src="${e.target.result}">
+      <p style="font-size:0.68rem;color:var(--muted)">${file.name}</p>
+    `;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ---- EDIT ----
+function editItem(id) {
+  const item = allItems.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('editItemId').value = id;
+  document.getElementById('fCategory').value = item.category || '';
+  document.getElementById('fName').value = item.name;
+  document.getElementById('fCode').value = item.code;
+  document.getElementById('fWsPrice').value = item.wsPrice;
+  document.getElementById('fRetailPrice').value = item.retailPrice;
+  document.getElementById('fQty').value = item.qty;
+  document.getElementById('fLowStock').value = item.lowStock || 5;
+  document.getElementById('fImageUrl').value = item.imageUrl || '';
+  document.getElementById('addBtnText').textContent = 'Update Item';
+  if (item.imageUrl) {
+    const area = document.getElementById('uploadArea');
+    area.innerHTML = `
+      <input type="file" id="fImage" accept="image/*" onchange="previewImage(event)">
+      <img class="img-preview" src="${item.imageUrl}">
+      <p style="font-size:0.68rem;color:var(--muted)">Current image</p>
+    `;
+  }
+  document.querySelector('.add-panel').scrollTop = 0;
+}
+
+// ---- CLEAR FORM ----
+function clearForm() {
+  document.getElementById('editItemId').value = '';
+  document.getElementById('fCategory').value = '';
+  document.getElementById('fName').value = '';
+  document.getElementById('fCode').value = '';
+  document.getElementById('fWsPrice').value = '';
+  document.getElementById('fRetailPrice').value = '';
+  document.getElementById('fQty').value = '';
+  document.getElementById('fLowStock').value = '5';
+  document.getElementById('fImageUrl').value = '';
+  document.getElementById('addBtnText').textContent = 'Add Item';
+  const area = document.getElementById('uploadArea');
+  area.innerHTML = `
+    <input type="file" id="fImage" accept="image/*" onchange="previewImage(event)">
+    <i class="fas fa-cloud-arrow-up"></i>
+    <p>Click to upload image</p>
+    <p style="font-size:0.65rem;color:#4a4a6a;">Cloudinary — JPG, PNG, WEBP</p>
+  `;
+}
+
+// ---- RESTOCK ----
+function openRestock(id) {
+  const item = allItems.find(i => i.id === id);
+  if (!item) return;
+  restockItemId = id;
+  document.getElementById('restockItemName').textContent = item.name;
+  document.getElementById('restockCurrent').textContent = item.qty;
+  document.getElementById('restockQty').value = '';
+  document.getElementById('restockModal').classList.add('open');
+}
+
+async function confirmRestock() {
+  const add = parseInt(document.getElementById('restockQty').value);
+  if (!add || add < 1) { showToast('Enter valid quantity', 'error'); return; }
+  const item = allItems.find(i => i.id === restockItemId);
+  try {
+    await db.collection('inventory').doc(restockItemId).update({
+      qty: item.qty + add
+    });
+    showToast(`Restocked ${add} units of ${item.name}`, 'success');
+    closeModal('restockModal');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ---- DELETE ----
+function openDelete(id) {
+  const item = allItems.find(i => i.id === id);
+  if (!item) return;
+  deleteItemId = id;
+  document.getElementById('deleteItemName').textContent = item.name;
+  document.getElementById('deleteModal').classList.add('open');
+}
+
+async function confirmDelete() {
+  try {
+    await db.collection('inventory').doc(deleteItemId).delete();
+    showToast('Item deleted', 'success');
+    closeModal('deleteModal');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ---- MODAL ----
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ---- TOAST ----
+function showToast(msg, type = 'warning', duration = 3500) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  const icon = type === 'error' ? 'fa-circle-xmark' : type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation';
+  toast.className = `toast ${type === 'error' ? 'error' : type === 'success' ? 'success-t' : ''}`;
+  toast.innerHTML = `<i class="fas ${icon}"></i><span>${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), duration);
+}
+</script>
+</body>
+</html>

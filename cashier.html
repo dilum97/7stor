@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7 Store — Cashier</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<style>
+  :root {
+    --bg: #080810;
+    --surface: #0e0e18;
+    --surface2: #161624;
+    --border: #252538;
+    --accent: #7c3aed;
+    --accent2: #06b6d4;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --success: #10b981;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    background: linear-gradient(135deg, #0a0a18 0%, #15032b 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, #a855f7, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .logo span { font-weight: 400; font-size: 0.85rem; color: var(--muted); -webkit-text-fill-color: var(--muted); margin-left: 8px; }
+  .nav-links { display: flex; gap: 1rem; }
+  .nav-link { padding: 8px 18px; border-radius: 6px; font-size: 0.78rem; font-family: 'Syne', sans-serif; font-weight: 600; cursor: pointer; text-decoration: none; transition: all 0.2s; border: 1px solid transparent; color: var(--muted); }
+  .nav-link:hover { color: var(--text); border-color: var(--border); background: var(--surface2); }
+  .nav-link.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* TABS */
+  .tab-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    padding: 0 2rem;
+    gap: 0;
+  }
+  .tab-btn {
+    padding: 14px 20px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+  /* TAB CONTENT */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* POS LAYOUT */
+  .pos-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    height: calc(100vh - 64px - 47px);
+    gap: 0;
+  }
+
+  /* ITEM SELECTOR */
+  .item-selector {
+    padding: 1.2rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .search-wrap { position: relative; }
+  .search-wrap i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.8rem; }
+  .search-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px 11px 38px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.82rem;
+    outline: none;
+    width: 100%;
+    transition: all 0.2s;
+  }
+  .search-bar:focus { border-color: var(--accent2); }
+
+  .cat-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+  .cat-scroll::-webkit-scrollbar { height: 3px; }
+  .cat-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .cat-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+  .cat-chip.active, .cat-chip:hover { border-color: var(--accent2); color: var(--accent2); background: rgba(6,182,212,0.08); }
+
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+  }
+
+  .item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .item-card:hover { border-color: var(--accent2); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(6,182,212,0.1); }
+  .item-card.out { opacity: 0.4; pointer-events: none; }
+  .item-card img { width: 100%; height: 100px; object-fit: cover; }
+  .item-card .no-img { width: 100%; height: 100px; background: var(--surface2); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 1.5rem; }
+  .item-card-body { padding: 10px; }
+  .item-card-cat { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+  .item-card-name { font-size: 0.78rem; font-weight: 700; margin-bottom: 4px; line-height: 1.3; }
+  .item-card-price { font-size: 0.82rem; font-weight: 700; color: var(--success); }
+  .item-card-qty { font-size: 0.65rem; color: var(--muted); }
+  .out-badge { position: absolute; top: 8px; right: 8px; background: var(--danger); color: #fff; font-size: 0.6rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+
+  /* CART */
+  .cart-panel {
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .cart-header {
+    padding: 1rem 1.2rem;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .cart-items { flex: 1; overflow-y: auto; padding: 0.8rem; display: flex; flex-direction: column; gap: 8px; }
+  .cart-items::-webkit-scrollbar { width: 4px; }
+  .cart-items::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .cart-empty { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.8rem; }
+  .cart-empty i { font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 0.8rem; }
+
+  .cart-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  .cart-item img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+  .cart-item-info { flex: 1; min-width: 0; }
+  .cart-item-name { font-size: 0.75rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cart-item-price { font-size: 0.7rem; color: var(--success); }
+  .cart-qty-controls { display: flex; align-items: center; gap: 6px; }
+  .qty-btn {
+    width: 24px; height: 24px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem;
+    transition: all 0.2s;
+  }
+  .qty-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .qty-num { font-size: 0.82rem; font-weight: 700; min-width: 20px; text-align: center; }
+  .remove-btn { color: var(--danger); cursor: pointer; font-size: 0.8rem; margin-left: 4px; }
+
+  /* CART SUMMARY */
+  .cart-summary {
+    border-top: 1px solid var(--border);
+    padding: 1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .summary-row { display: flex; justify-content: space-between; font-size: 0.8rem; }
+  .summary-row.total { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1.1rem; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
+  .summary-row.total span:last-child { color: var(--success); }
+
+  .discount-row { display: flex; gap: 8px; align-items: center; }
+  .discount-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.8rem;
+    padding: 8px 12px;
+    outline: none;
+  }
+  .discount-input:focus { border-color: var(--warning); }
+
+  .checkout-btn {
+    background: linear-gradient(135deg, var(--success), #059669);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 0.95rem;
+    cursor: pointer;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+  .checkout-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .checkout-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* DASHBOARD */
+  .dashboard { padding: 1.5rem; overflow-y: auto; height: calc(100vh - 111px); display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .dash-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card.purple::before { background: linear-gradient(90deg, var(--accent), transparent); }
+  .stat-card.cyan::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+  .stat-card.green::before { background: linear-gradient(90deg, var(--success), transparent); }
+  .stat-card.amber::before { background: linear-gradient(90deg, var(--warning), transparent); }
+  .stat-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; }
+  .stat-value { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; }
+  .stat-sub { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
+
+  .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.2rem;
+  }
+  .chart-title { font-family: 'Syne', sans-serif; font-size: 0.88rem; font-weight: 700; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; }
+  .chart-title select { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.7rem; padding: 4px 8px; outline: none; }
+
+  /* SALES HISTORY TABLE */
+  .sales-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .sales-table-title { padding: 1rem 1.2rem; font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 700; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: var(--surface2); }
+  th { padding: 10px 14px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); text-align: left; }
+  td { padding: 10px 14px; font-size: 0.75rem; border-bottom: 1px solid rgba(37,37,56,0.6); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(124,58,237,0.04); }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 200; display: none; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 460px; max-height: 85vh; overflow-y: auto; }
+  .modal h3 { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; margin-bottom: 1.5rem; }
+  .receipt { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 1.2rem; font-size: 0.78rem; line-height: 2; }
+  .receipt-row { display: flex; justify-content: space-between; }
+  .receipt-divider { border: none; border-top: 1px dashed var(--border); margin: 8px 0; }
+  .receipt-total { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1rem; }
+  .modal-btns { display: flex; gap: 10px; margin-top: 1.5rem; }
+  .btn { padding: 11px 20px; border-radius: 8px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.85rem; border: none; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #9333ea); color: #fff; }
+  .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* TOAST */
+  .toast-container { position: fixed; top: 80px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+  .toast { background: var(--surface); border: 1px solid var(--warning); border-left: 4px solid var(--warning); border-radius: 8px; padding: 12px 16px; font-size: 0.78rem; display: flex; align-items: center; gap: 10px; animation: slideIn 0.3s ease; max-width: 300px; }
+  .toast i { color: var(--warning); }
+  .toast.error { border-color: var(--danger); }
+  .toast.error i { color: var(--danger); }
+  .toast.success-t { border-color: var(--success); }
+  .toast.success-t i { color: var(--success); }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">7 Store <span>/ Cashier</span></div>
+  <div class="nav-links">
+    <a class="nav-link" href="store.html"><i class="fas fa-boxes-stacked"></i> Store</a>
+    <a class="nav-link active" href="cashier.html"><i class="fas fa-cash-register"></i> Cashier</a>
+  </div>
+</header>
+
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('pos')"><i class="fas fa-cash-register"></i> Point of Sale</button>
+  <button class="tab-btn" onclick="switchTab('dashboard')"><i class="fas fa-chart-line"></i> Revenue & Analytics</button>
+</div>
+
+<!-- POS TAB -->
+<div class="tab-content active" id="tab-pos">
+  <div class="pos-layout">
+    <div class="item-selector">
+      <div class="search-wrap">
+        <i class="fas fa-search"></i>
+        <input class="search-bar" type="text" placeholder="Search items or scan code..." oninput="filterItems(this.value)" id="posSearch">
+      </div>
+      <div class="cat-scroll" id="posCatFilters"></div>
+      <div class="items-grid" id="itemsGrid">
+        <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--muted)"><i class="fas fa-spinner fa-spin"></i> Loading inventory...</div>
+      </div>
+    </div>
+
+    <div class="cart-panel">
+      <div class="cart-header">
+        🛒 Cart <span id="cartCount" style="background:var(--accent);color:#fff;font-size:0.7rem;padding:2px 8px;border-radius:20px;">0</span>
+        <button onclick="clearCart()" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:0.75rem;">Clear all</button>
+      </div>
+      <div class="cart-items" id="cartItems">
+        <div class="cart-empty"><i class="fas fa-cart-shopping"></i>Cart is empty<br><span style="font-size:0.72rem;">Click items to add</span></div>
+      </div>
+      <div class="cart-summary">
+        <div class="summary-row"><span>Subtotal</span><span id="subtotal">Rs. 0.00</span></div>
+        <div class="discount-row">
+          <span style="font-size:0.72rem;color:var(--muted);white-space:nowrap">Discount Rs.</span>
+          <input class="discount-input" type="number" id="discountInput" placeholder="0" min="0" oninput="updateCartTotals()">
+        </div>
+        <div class="summary-row total"><span>Total</span><span id="cartTotal">Rs. 0.00</span></div>
+        <button class="checkout-btn" id="checkoutBtn" onclick="openCheckout()" disabled>
+          <i class="fas fa-circle-check"></i> Checkout
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD TAB -->
+<div class="tab-content" id="tab-dashboard">
+  <div class="dashboard">
+
+    <div class="dash-stats">
+      <div class="stat-card purple">
+        <div class="stat-label">Today's Revenue</div>
+        <div class="stat-value" id="todayRev" style="color:var(--accent)">Rs. 0</div>
+        <div class="stat-sub" id="todaySales">0 sales today</div>
+      </div>
+      <div class="stat-card cyan">
+        <div class="stat-label">This Month</div>
+        <div class="stat-value" id="monthRev" style="color:var(--accent2)">Rs. 0</div>
+        <div class="stat-sub" id="monthSales">0 sales</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Total Revenue</div>
+        <div class="stat-value" id="totalRev" style="color:var(--success)">Rs. 0</div>
+        <div class="stat-sub" id="totalSales">all time</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-label">Avg. Sale Value</div>
+        <div class="stat-value" id="avgSale" style="color:var(--warning)">Rs. 0</div>
+        <div class="stat-sub">per transaction</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">
+          Monthly Revenue Growth
+          <select id="chartYearSelect" onchange="buildRevenueChart()">
+            <option value="2024">2024</option>
+            <option value="2025" selected>2025</option>
+            <option value="2026">2026</option>
+          </select>
+        </div>
+        <canvas id="revenueChart" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top Categories</div>
+        <canvas id="catChart" height="220"></canvas>
+      </div>
+    </div>
+
+    <div class="sales-table-wrap">
+      <div class="sales-table-title">
+        Recent Sales
+        <span style="font-size:0.72rem;color:var(--muted)" id="salesDateRange"></span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Items</th>
+            <th>Subtotal</th>
+            <th>Discount</th>
+            <th>Total</th>
+            <th>Profit</th>
+          </tr>
+        </thead>
+        <tbody id="salesTableBody">
+          <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- CHECKOUT MODAL -->
+<div class="modal-overlay" id="checkoutModal">
+  <div class="modal">
+    <h3><i class="fas fa-receipt" style="color:var(--success)"></i> Checkout</h3>
+    <div class="receipt" id="receiptContent"></div>
+    <div style="margin-top:1rem;">
+      <label style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);">Cash Received (Rs.)</label>
+      <input type="number" id="cashReceived" placeholder="Enter amount" oninput="calcChange()"
+        style="width:100%;margin-top:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Space Mono',monospace;font-size:1rem;padding:12px;outline:none;">
+      <div style="margin-top:10px;font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;">
+        Change: <span id="changeAmount" style="color:var(--success)">Rs. 0.00</span>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal('checkoutModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="completeSale()" style="background:linear-gradient(135deg,var(--success),#059669)">
+        <i class="fas fa-circle-check"></i> Complete Sale
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyC0FoX4oDkeVld_GNWT3nPVzicmzhXCMH8",
+  authDomain: "store-81e88.firebaseapp.com",
+  projectId: "store-81e88",
+  storageBucket: "store-81e88.firebasestorage.app",
+  messagingSenderId: "681839217421",
+  appId: "1:681839217421:web:702a25e2b2c44d95723e44"
+};// ============================================================
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let inventory = [];
+let cart = [];
+let salesData = [];
+let posCategory = 'All';
+let revenueChart = null;
+let catChart = null;
+
+// ---- INIT ----
+window.onload = () => {
+  loadInventory();
+  loadSales();
+};
+
+// ---- LOAD INVENTORY ----
+function loadInventory() {
+  db.collection('inventory').onSnapshot(snap => {
+    inventory = [];
+    snap.forEach(doc => inventory.push({ id: doc.id, ...doc.data() }));
+    buildPosCats();
+    renderItemsGrid(inventory);
+  });
+}
+
+// ---- LOAD SALES ----
+function loadSales() {
+  db.collection('sales').orderBy('date', 'desc').limit(200).onSnapshot(snap => {
+    salesData = [];
+    snap.forEach(doc => salesData.push({ id: doc.id, ...doc.data() }));
+    updateDashboard();
+    renderSalesTable();
+    buildRevenueChart();
+    buildCatChart();
+  });
+}
+
+// ---- ITEMS GRID ----
+function buildPosCats() {
+  const cats = ['All', ...new Set(inventory.map(i => i.category).filter(Boolean))];
+  document.getElementById('posCatFilters').innerHTML = cats.map(c =>
+    `<button class="cat-chip ${c === posCategory ? 'active' : ''}" onclick="setPosCategory('${c}')">${c}</button>`
+  ).join('');
+}
+
+function setPosCategory(cat) {
+  posCategory = cat;
+  buildPosCats();
+  const q = document.getElementById('posSearch').value;
+  filterItems(q);
+}
+
+function filterItems(q) {
+  let items = posCategory === 'All' ? inventory : inventory.filter(i => i.category === posCategory);
+  if (q) items = items.filter(i => i.name.toLowerCase().includes(q.toLowerCase()) || i.code.toLowerCase().includes(q.toLowerCase()));
+  renderItemsGrid(items);
+}
+
+function renderItemsGrid(items) {
+  const grid = document.getElementById('itemsGrid');
+  if (!items.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--muted)">No items found</div>`;
+    return;
+  }
+  grid.innerHTML = items.map(item => `
+    <div class="item-card ${item.qty <= 0 ? 'out' : ''}" onclick="addToCart('${item.id}')">
+      ${item.qty <= 0 ? '<span class="out-badge">OUT</span>' : ''}
+      ${item.imageUrl ? `<img src="${item.imageUrl}" alt="">` : `<div class="no-img"><i class="fas fa-microchip"></i></div>`}
+      <div class="item-card-body">
+        <div class="item-card-cat">${item.category || ''}</div>
+        <div class="item-card-name">${item.name}</div>
+        <div class="item-card-price">Rs. ${Number(item.retailPrice).toLocaleString()}</div>
+        <div class="item-card-qty">Stock: ${item.qty}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ---- CART ----
+function addToCart(id) {
+  const item = inventory.find(i => i.id === id);
+  if (!item || item.qty <= 0) return;
+  const existing = cart.find(c => c.id === id);
+  if (existing) {
+    if (existing.qty >= item.qty) { showToast('Not enough stock!', 'error'); return; }
+    existing.qty++;
+  } else {
+    cart.push({ id: item.id, name: item.name, imageUrl: item.imageUrl || '', retailPrice: item.retailPrice, wsPrice: item.wsPrice, qty: 1, maxQty: item.qty });
+  }
+  renderCart();
+}
+
+function changeQty(id, delta) {
+  const cartItem = cart.find(c => c.id === id);
+  if (!cartItem) return;
+  cartItem.qty += delta;
+  if (cartItem.qty <= 0) cart = cart.filter(c => c.id !== id);
+  renderCart();
+}
+
+function removeFromCart(id) {
+  cart = cart.filter(c => c.id !== id);
+  renderCart();
+}
+
+function clearCart() {
+  cart = [];
+  document.getElementById('discountInput').value = '';
+  renderCart();
+}
+
+function renderCart() {
+  const container = document.getElementById('cartItems');
+  document.getElementById('cartCount').textContent = cart.reduce((s, i) => s + i.qty, 0);
+
+  if (!cart.length) {
+    container.innerHTML = `<div class="cart-empty"><i class="fas fa-cart-shopping"></i>Cart is empty<br><span style="font-size:0.72rem;">Click items to add</span></div>`;
+    document.getElementById('checkoutBtn').disabled = true;
+    updateCartTotals();
+    return;
+  }
+
+  container.innerHTML = cart.map(item => `
+    <div class="cart-item">
+      ${item.imageUrl ? `<img src="${item.imageUrl}" alt="">` : `<div style="width:40px;height:40px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="fas fa-box" style="color:var(--muted)"></i></div>`}
+      <div class="cart-item-info">
+        <div class="cart-item-name">${item.name}</div>
+        <div class="cart-item-price">Rs. ${Number(item.retailPrice).toLocaleString()} each</div>
+      </div>
+      <div class="cart-qty-controls">
+        <button class="qty-btn" onclick="changeQty('${item.id}', -1)">−</button>
+        <span class="qty-num">${item.qty}</span>
+        <button class="qty-btn" onclick="changeQty('${item.id}', 1)">+</button>
+        <i class="fas fa-times remove-btn" onclick="removeFromCart('${item.id}')"></i>
+      </div>
+    </div>
+  `).join('');
+
+  document.getElementById('checkoutBtn').disabled = false;
+  updateCartTotals();
+}
+
+function updateCartTotals() {
+  const sub = cart.reduce((s, i) => s + i.retailPrice * i.qty, 0);
+  const disc = parseFloat(document.getElementById('discountInput').value) || 0;
+  const total = Math.max(0, sub - disc);
+  document.getElementById('subtotal').textContent = 'Rs. ' + sub.toLocaleString('en', {minimumFractionDigits:2});
+  document.getElementById('cartTotal').textContent = 'Rs. ' + total.toLocaleString('en', {minimumFractionDigits:2});
+}
+
+// ---- CHECKOUT ----
+function getTotal() {
+  const sub = cart.reduce((s, i) => s + i.retailPrice * i.qty, 0);
+  const disc = parseFloat(document.getElementById('discountInput').value) || 0;
+  return Math.max(0, sub - disc);
+}
+
+function openCheckout() {
+  const sub = cart.reduce((s, i) => s + i.retailPrice * i.qty, 0);
+  const disc = parseFloat(document.getElementById('discountInput').value) || 0;
+  const total = Math.max(0, sub - disc);
+  document.getElementById('cashReceived').value = '';
+  document.getElementById('changeAmount').textContent = 'Rs. 0.00';
+
+  let rows = cart.map(i => `
+    <div class="receipt-row"><span>${i.name} x${i.qty}</span><span>Rs. ${(i.retailPrice*i.qty).toLocaleString()}</span></div>
+  `).join('');
+
+  document.getElementById('receiptContent').innerHTML = `
+    <div class="receipt-row" style="font-weight:700;margin-bottom:4px;"><span>7 Store</span><span>${new Date().toLocaleDateString()}</span></div>
+    <hr class="receipt-divider">
+    ${rows}
+    <hr class="receipt-divider">
+    <div class="receipt-row"><span>Subtotal</span><span>Rs. ${sub.toLocaleString()}</span></div>
+    ${disc > 0 ? `<div class="receipt-row" style="color:var(--warning)"><span>Discount</span><span>- Rs. ${disc.toLocaleString()}</span></div>` : ''}
+    <div class="receipt-row receipt-total"><span>TOTAL</span><span style="color:var(--success)">Rs. ${total.toLocaleString()}</span></div>
+  `;
+  document.getElementById('checkoutModal').classList.add('open');
+}
+
+function calcChange() {
+  const cash = parseFloat(document.getElementById('cashReceived').value) || 0;
+  const total = getTotal();
+  const change = cash - total;
+  document.getElementById('changeAmount').textContent = change >= 0
+    ? `Rs. ${change.toLocaleString('en',{minimumFractionDigits:2})}`
+    : '⚠️ Insufficient';
+  document.getElementById('changeAmount').style.color = change >= 0 ? 'var(--success)' : 'var(--danger)';
+}
+
+async function completeSale() {
+  const cash = parseFloat(document.getElementById('cashReceived').value) || 0;
+  const total = getTotal();
+  if (cash < total) { showToast('Cash received is less than total!', 'error'); return; }
+
+  const sub = cart.reduce((s, i) => s + i.retailPrice * i.qty, 0);
+  const disc = parseFloat(document.getElementById('discountInput').value) || 0;
+  const profit = cart.reduce((s, i) => s + (i.retailPrice - i.wsPrice) * i.qty, 0) - disc;
+
+  const saleData = {
+    date: firebase.firestore.FieldValue.serverTimestamp(),
+    items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, retailPrice: i.retailPrice, wsPrice: i.wsPrice })),
+    subtotal: sub,
+    discount: disc,
+    total,
+    profit,
+    cashReceived: cash,
+    change: cash - total
+  };
+
+  try {
+    // Save sale
+    await db.collection('sales').add(saleData);
+
+    // Deduct stock
+    const batch = db.batch();
+    for (const cartItem of cart) {
+      const invItem = inventory.find(i => i.id === cartItem.id);
+      if (invItem) {
+        batch.update(db.collection('inventory').doc(cartItem.id), {
+          qty: firebase.firestore.FieldValue.increment(-cartItem.qty)
+        });
+      }
+    }
+    await batch.commit();
+
+    showToast('Sale completed! Rs. ' + total.toLocaleString(), 'success');
+    closeModal('checkoutModal');
+    clearCart();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
+// ---- DASHBOARD ----
+function updateDashboard() {
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
+
+  let todayRev = 0, todayCnt = 0;
+  let monthRev = 0, monthCnt = 0;
+  let totalRev = 0, totalCnt = 0;
+
+  salesData.forEach(s => {
+    const d = s.date?.toDate ? s.date.toDate() : new Date(s.date);
+    const rev = s.total || 0;
+    totalRev += rev; totalCnt++;
+    if (d.toDateString() === todayStr) { todayRev += rev; todayCnt++; }
+    if (d.getMonth() === thisMonth && d.getFullYear() === thisYear) { monthRev += rev; monthCnt++; }
+  });
+
+  document.getElementById('todayRev').textContent = 'Rs. ' + Math.round(todayRev).toLocaleString();
+  document.getElementById('todaySales').textContent = todayCnt + ' sales today';
+  document.getElementById('monthRev').textContent = 'Rs. ' + Math.round(monthRev).toLocaleString();
+  document.getElementById('monthSales').textContent = monthCnt + ' sales';
+  document.getElementById('totalRev').textContent = 'Rs. ' + Math.round(totalRev).toLocaleString();
+  document.getElementById('totalSales').textContent = totalCnt + ' total sales';
+  document.getElementById('avgSale').textContent = totalCnt > 0 ? 'Rs. ' + Math.round(totalRev / totalCnt).toLocaleString() : 'Rs. 0';
+}
+
+function renderSalesTable() {
+  const tbody = document.getElementById('salesTableBody');
+  if (!salesData.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--muted)">No sales yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = salesData.slice(0, 50).map(s => {
+    const d = s.date?.toDate ? s.date.toDate() : new Date();
+    const itemsSummary = (s.items || []).map(i => `${i.name} x${i.qty}`).join(', ');
+    return `<tr>
+      <td>${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${itemsSummary}</td>
+      <td>Rs. ${(s.subtotal||0).toLocaleString()}</td>
+      <td style="color:var(--warning)">${s.discount > 0 ? '- Rs. ' + s.discount.toLocaleString() : '—'}</td>
+      <td style="color:var(--success);font-weight:700">Rs. ${(s.total||0).toLocaleString()}</td>
+      <td style="color:${(s.profit||0) > 0 ? 'var(--success)' : 'var(--danger)'}">Rs. ${Math.round(s.profit||0).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ---- CHARTS ----
+function buildRevenueChart() {
+  const year = parseInt(document.getElementById('chartYearSelect').value);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const revByMonth = new Array(12).fill(0);
+  const profitByMonth = new Array(12).fill(0);
+
+  salesData.forEach(s => {
+    const d = s.date?.toDate ? s.date.toDate() : new Date();
+    if (d.getFullYear() === year) {
+      revByMonth[d.getMonth()] += s.total || 0;
+      profitByMonth[d.getMonth()] += s.profit || 0;
+    }
+  });
+
+  if (revenueChart) revenueChart.destroy();
+  const ctx = document.getElementById('revenueChart').getContext('2d');
+  revenueChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'Revenue',
+          data: revByMonth,
+          backgroundColor: 'rgba(124,58,237,0.6)',
+          borderColor: '#7c3aed',
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: 'Profit',
+          data: profitByMonth,
+          backgroundColor: 'rgba(16,185,129,0.5)',
+          borderColor: '#10b981',
+          borderWidth: 1,
+          borderRadius: 4,
+          type: 'line',
+          tension: 0.4,
+          fill: false,
+          pointBackgroundColor: '#10b981',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Space Mono', size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#64748b', font: { family: 'Space Mono', size: 10 } }, grid: { color: 'rgba(42,42,62,0.5)' } },
+        y: { ticks: { color: '#64748b', font: { family: 'Space Mono', size: 10 }, callback: v => 'Rs.' + (v/1000).toFixed(0) + 'k' }, grid: { color: 'rgba(42,42,62,0.5)' } }
+      }
+    }
+  });
+}
+
+function buildCatChart() {
+  const catRevenue = {};
+  salesData.forEach(s => {
+    (s.items || []).forEach(item => {
+      const invItem = inventory.find(i => i.id === item.id);
+      const cat = invItem?.category || 'Other';
+      catRevenue[cat] = (catRevenue[cat] || 0) + (item.retailPrice * item.qty);
+    });
+  });
+
+  const labels = Object.keys(catRevenue);
+  const data = Object.values(catRevenue);
+  const colors = ['#7c3aed','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1'];
+
+  if (catChart) catChart.destroy();
+  const ctx = document.getElementById('catChart').getContext('2d');
+  catChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors.slice(0, labels.length), borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { family: 'Space Mono', size: 10 }, padding: 10 } }
+      }
+    }
+  });
+}
+
+// ---- TABS ----
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (tab === 'dashboard') { buildRevenueChart(); buildCatChart(); }
+}
+
+// ---- MODAL ----
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ---- TOAST ----
+function showToast(msg, type = 'warning', duration = 3500) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  const icon = type === 'error' ? 'fa-circle-xmark' : type === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation';
+  toast.className = `toast ${type === 'error' ? 'error' : type === 'success' ? 'success-t' : ''}`;
+  toast.innerHTML = `<i class="fas ${icon}"></i><span>${msg}</span>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), duration);
+}
+</script>
+</body>
+</html>
