@@ -670,6 +670,7 @@ let activeCategory = 'All';
 let restockItemId = null;
 let deleteItemId = null;
 let uploadedImageUrl = '';
+let selectedFile = null;
 
 // ---- INIT ----
 window.onload = () => {
@@ -788,11 +789,11 @@ async function saveItem() {
   btn.disabled = true;
 
   // Upload image if file selected
-  const fileInput = document.getElementById('fImage');
   let finalImageUrl = imageUrl;
-  if (fileInput.files[0]) {
-    finalImageUrl = await uploadToCloudinary(fileInput.files[0]);
+  if (selectedFile) {
+    finalImageUrl = await uploadToCloudinary(selectedFile);
     if (!finalImageUrl) { btn.disabled = false; return; }
+    selectedFile = null; // ✅ upload වුණාට පස්සේ clear
   }
 
   const data = { category, name, code, wsPrice, retailPrice, qty, lowStock, imageUrl: finalImageUrl };
@@ -864,6 +865,7 @@ async function uploadToCloudinary(file) {
 function previewImage(event) {
   const file = event.target.files[0];
   if (!file) return;
+  selectedFile = file; // globally save — input replace වුණත් file නැති වෙන්නේ නෑ
   const reader = new FileReader();
   reader.onload = e => {
     const area = document.getElementById('uploadArea');
@@ -913,6 +915,7 @@ function clearForm() {
   document.getElementById('fLowStock').value = '5';
   document.getElementById('fImageUrl').value = '';
   document.getElementById('addBtnText').textContent = 'Add Item';
+  selectedFile = null; // ✅ clear selected file
   const area = document.getElementById('uploadArea');
   area.innerHTML = `
     <input type="file" id="fImage" accept="image/*" onchange="previewImage(event)">
